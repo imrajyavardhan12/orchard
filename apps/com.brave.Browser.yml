@@ -1,0 +1,7 @@
+bundle_id: com.brave.Browser
+name: Brave Browser
+# Brave sets its Sparkle feed in code, so it isn't in Info.plist. The feed's sparkle:version
+# (196.59) matches CFBundleVersion exactly; the visible version adds a Chromium prefix.
+sparkle_feed:
+  arm64: https://updates.bravesoftware.com/sparkle/Brave-Browser/stable-arm64/appcast.xml
+  x86_64: https://updates.bravesoftware.com/sparkle/Brave-Browser/stable/appcast.xml

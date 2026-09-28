@@ -1,0 +1,9 @@
+bundle_id: md.obsidian
+name: Obsidian
+# Obsidian downloads new versions as obsidian-<version>.asar and runs the newest one;
+# the app bundle keeps the installer's version until you reinstall.
+installed_version:
+  glob: "~/Library/Application Support/obsidian/obsidian-*.asar"
+notes: >
+  Obsidian updates itself in place. The version in the app bundle is the installer version,
+  so Ripe reads the running version from Obsidian's downloaded update files instead.
