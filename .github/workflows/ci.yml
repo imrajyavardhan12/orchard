@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:  # redeploy the catalog by hand
 
 permissions:
   contents: read
@@ -21,7 +22,7 @@ jobs:
 
   # Publishes dist/index.json to GitHub Pages. Needs a public repository (or a paid plan).
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.private
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !github.event.repository.private
     needs: validate
     runs-on: ubuntu-latest
     permissions:
