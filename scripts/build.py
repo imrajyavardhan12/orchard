@@ -31,8 +31,8 @@ CASK_TOKEN = re.compile(r"^[a-z0-9][a-z0-9@+._-]*$")
 ARCHITECTURES = ("arm64", "x86_64")
 # Where an app may keep its real version. Ripe only lists these folders; it never reads files.
 VERSION_GLOB_ROOTS = ("~/Library/", "/Library/", "/Applications/")
-KNOWN_KEYS = {"bundle_id", "name", "sparkle_feed", "homebrew_cask", "installed_version", "notes"}
-DIRECTIVES = {"sparkle_feed", "homebrew_cask", "installed_version", "notes"}
+KNOWN_KEYS = {"bundle_id", "name", "sparkle_feed", "fallback_sparkle_feed", "homebrew_cask", "installed_version", "notes"}
+DIRECTIVES = {"sparkle_feed", "fallback_sparkle_feed", "homebrew_cask", "installed_version", "notes"}
 MAX_NOTES = 500
 
 
@@ -78,19 +78,22 @@ def compile_entry(path: Path, data: object) -> tuple[str, dict]:
 
     entry: dict = {"name": name}
 
+    def feed_map(key: str):
+        # One URL for every Mac, or one per CPU. Always compiled to the per-CPU form.
+        feed = data[key]
+        if isinstance(feed, str):
+            url = https_url(feed, key)
+            return {arch: url for arch in ARCHITECTURES}
+        if isinstance(feed, dict) and feed and set(feed) <= set(ARCHITECTURES):
+            return {arch: https_url(url, f"{key}.{arch}") for arch, url in feed.items()}
+        raise Invalid(f"{key} must be a URL or a mapping with keys {' and/or '.join(ARCHITECTURES)}")
+
+    if "sparkle_feed" in data and "fallback_sparkle_feed" in data:
+        problems.append("use sparkle_feed or fallback_sparkle_feed, not both")
     if "sparkle_feed" in data:
-        feed = data["sparkle_feed"]
-
-        def sparkle():
-            # One URL for every Mac, or one per CPU. Always compiled to the per-CPU form.
-            if isinstance(feed, str):
-                url = https_url(feed, "sparkle_feed")
-                return {arch: url for arch in ARCHITECTURES}
-            if isinstance(feed, dict) and feed and set(feed) <= set(ARCHITECTURES):
-                return {arch: https_url(url, f"sparkle_feed.{arch}") for arch, url in feed.items()}
-            raise Invalid(f"sparkle_feed must be a URL or a mapping with keys {' and/or '.join(ARCHITECTURES)}")
-
-        entry["sparkleFeed"] = check(sparkle)
+        entry["sparkleFeed"] = check(lambda: feed_map("sparkle_feed"))
+    if "fallback_sparkle_feed" in data:
+        entry["fallbackSparkleFeed"] = check(lambda: feed_map("fallback_sparkle_feed"))
 
     if "homebrew_cask" in data:
         token = data["homebrew_cask"]

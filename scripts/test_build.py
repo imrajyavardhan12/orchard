@@ -44,6 +44,30 @@ class CompileEntryTests(unittest.TestCase):
         )
         self.assertEqual(entry["sparkleFeed"], {"arm64": "https://example.com/arm64.xml"})
 
+    def test_fallback_feed_compiles_separately(self):
+        _, entry = self.compile(
+            "net.matthewpalmer.Rocket.yml",
+            """
+            bundle_id: net.matthewpalmer.Rocket
+            name: Rocket
+            fallback_sparkle_feed: https://macrelease.matthewpalmer.net/distribution/appcasts/rocket.xml
+            """,
+        )
+        self.assertNotIn("sparkleFeed", entry)
+        self.assertEqual(set(entry["fallbackSparkleFeed"]), {"arm64", "x86_64"})
+
+    def test_feed_and_fallback_feed_are_exclusive(self):
+        self.assertInvalid(
+            "com.example.App.yml",
+            """
+            bundle_id: com.example.App
+            name: Example
+            sparkle_feed: https://example.com/a.xml
+            fallback_sparkle_feed: https://example.com/b.xml
+            """,
+            "not both",
+        )
+
     def test_notes_are_normalized(self):
         _, entry = self.compile(
             "com.example.App.yml",
