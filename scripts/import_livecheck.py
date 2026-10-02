@@ -5,8 +5,12 @@
 """Seed fallback Sparkle feeds from Homebrew casks whose livecheck reads a Sparkle appcast.
 
     git clone --depth 1 https://github.com/Homebrew/homebrew-cask.git /tmp/homebrew-cask
-    uv run scripts/import_livecheck.py --casks /tmp/homebrew-cask --ripe "$(which ripe)"
-    uv run scripts/import_livecheck.py ... --dry-run     # report only, write nothing
+    uv run scripts/import_livecheck.py --casks /tmp/homebrew-cask --ripe "$(which ripe)" --dry-run
+    uv run scripts/import_livecheck.py ... --only keepingyouawake     # write entries for these casks
+
+Writing needs `--only`: orchard stays a curated catalog, so an entry is added when someone has a
+reason for it (a `ripe why` report, an app known to set its feed in code), never in bulk. A dry
+run over every cask shows which ones would pass.
 
 The cask JSON API leaves livecheck out, so feed URLs come from the casks' Ruby source; the
 rest (version, app name, bundle IDs) comes from the API. A feed is written only when:
@@ -252,8 +256,12 @@ def main() -> int:
     parser.add_argument("--casks", type=Path, required=True, help="a homebrew-cask checkout")
     parser.add_argument("--ripe", required=True, help="path to a ripe binary that has `ripe feed`")
     parser.add_argument("--cask-json", type=Path, help="a saved copy of the cask API (default: download)")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="report only, write nothing")
+    parser.add_argument("--only", action="append", default=[], help="cask token(s) to write, comma-separated")
     args = parser.parse_args()
+    only = {token.strip() for value in args.only for token in value.split(",") if token.strip()}
+    if not only and not args.dry_run:
+        parser.error("name the casks to add with --only (or use --dry-run to survey every cask)")
 
     apps_dir = ROOT / "apps"
     generated, handwritten = set(), set()
@@ -268,6 +276,11 @@ def main() -> int:
             casks = json.load(response)
 
     feeds = livecheck_feeds(args.casks)
+    if only:
+        missing = only - set(feeds)
+        if missing:
+            parser.error(f"no Sparkle livecheck in: {', '.join(sorted(missing))}")
+        feeds = {token: url for token, url in feeds.items() if token in only}
     found, skipped = candidates(casks, feeds, handwritten)
     results = check_feeds(args.ripe, sorted({candidate.feed for candidate in found}))
 
@@ -305,7 +318,8 @@ def main() -> int:
     print(f"{written} written{' (dry run)' if args.dry_run else ''}, {unchanged} unchanged")
     for reason, count in sorted(reasons.items(), key=lambda item: -item[1]):
         print(f"  skipped {count:4}: {reason}")
-    stale = sorted(generated - verified)
+    # Only a full survey can tell which generated entries stopped verifying.
+    stale = [] if only else sorted(generated - verified)
     if stale:
         print(f"{len(stale)} generated entries no longer verify (not removed; check by hand): {', '.join(stale)}")
     if args.dry_run:
